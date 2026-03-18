@@ -57,11 +57,12 @@ export async function queryData(
   sessionId: string,
   question: string,
   filename: string,
-  sheet: string
+  sheet: string,
+  saveHistory: boolean = true
 ): Promise<QueryResult> {
   const res = await axios.post(
     `${BASE}/query`,
-    { question, filename, sheet },
+    { question, filename, sheet, save_history: saveHistory },
     { headers: headers(sessionId) }
   );
   return res.data;
@@ -79,7 +80,7 @@ export async function getHistory(
 export async function submitFeedback(
   sessionId: string,
   historyIndex: number,
-  rating: "up" | "down"
+  rating: number
 ): Promise<{ success: boolean; summary: FeedbackSummary }> {
   const res = await axios.post(
     `${BASE}/feedback`,

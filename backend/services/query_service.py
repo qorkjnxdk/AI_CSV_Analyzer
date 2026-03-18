@@ -1,7 +1,11 @@
 import os
+import json
+import logging
 import httpx
 import pandas as pd
 from dotenv import load_dotenv
+
+logger = logging.getLogger("uvicorn.error")
 
 load_dotenv()                         # backend/.env
 load_dotenv(dotenv_path="../.env")    # project root .env
@@ -11,15 +15,20 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
 SYSTEM_PROMPT = """You are a data analysis assistant. You receive metadata about a pandas DataFrame and a user question.
-Your job is to generate Python/pandas code that answers the question.
+Your job is to generate Python/pandas code that answers the question or just a string that answers their question if code cannot be ran for this query.  
+
+You have two options, returning code that helps query the table that answers their prompt OR
+returning a string that answers the user's query (e.g. about semantic meaning of the rows).
+
+Format the answer as {"type": "code"/"string", "result": generated code/string}
 
 Rules:
 - The DataFrame is available as `df`.
 - pandas is imported as `pd`, numpy as `np`, matplotlib.pyplot as `plt`, seaborn as `sns`.
 - Store the final answer in a variable called `result`.
+- If the question asks for an explanation, description, or meaning of a column or the data (not a computation), set `result` to a plain-text string with your answer. Do NOT run any data queries for these questions.
 - If the question asks for a chart/plot/graph/visualization, generate matplotlib or seaborn code to create it. Do NOT set `result` for chart-only answers.
 - For charts: always add axis labels and a title.
-- Only output Python code — no explanations, no markdown fences.
 - Do NOT import any modules.
 - Do NOT use open(), os, subprocess, or __import__.
 - Do NOT access the file system or network.
@@ -42,8 +51,13 @@ def build_prompt(df: pd.DataFrame, question: str) -> str:
     )
 
 
-async def ask_openai(df: pd.DataFrame, question: str) -> str:
-    """Send a question to OpenAI and return the generated code."""
+async def ask_openai(df: pd.DataFrame, question: str) -> dict:
+    """Send a question to OpenAI and return generated code or a text response.
+
+    Returns a dict with:
+        - type: "code" | "text"
+        - data: the content string
+    """
     user_prompt = build_prompt(df, question)
 
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -66,13 +80,38 @@ async def ask_openai(df: pd.DataFrame, question: str) -> str:
         response.raise_for_status()
         data = response.json()
 
-    code = data["choices"][0]["message"]["content"].strip()
-    # Strip markdown fences if the model wraps the code
-    if code.startswith("```"):
-        lines = code.split("\n")
+    # Check for refusal in the API response
+    refusal = data["choices"][0]["message"].get("refusal")
+    if refusal:
+        return {"type": "text", "data": refusal}
+
+    content = data["choices"][0]["message"]["content"].strip()
+    logger.info("[LLM raw response]\n%s", content)
+    # Strip markdown fences if the model wraps the response
+    if content.startswith("```"):
+        lines = content.split("\n")
         lines = lines[1:]  # remove opening fence
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
-        code = "\n".join(lines)
+        content = "\n".join(lines)
 
-    return code
+    # Parse the structured JSON response from the LLM
+    try:
+        parsed = json.loads(content)
+        resp_type = parsed.get("type", "")
+        result = parsed.get("result", "")
+
+        if resp_type == "string":
+            return {"type": "text", "data": result}
+        if resp_type == "code":
+            return {"type": "code", "data": result}
+    except (json.JSONDecodeError, AttributeError):
+        pass
+
+    # Fallback: if not valid JSON, try to detect code vs text
+    try:
+        compile(content, "<generated>", "exec")
+    except SyntaxError:
+        return {"type": "text", "data": content}
+
+    return {"type": "code", "data": content}

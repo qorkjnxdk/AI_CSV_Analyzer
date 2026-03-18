@@ -35,10 +35,10 @@ export interface HistoryEntry {
   sheet: string;
   timestamp: string;
   result: QueryResult;
+  rating: number | null;
 }
 
 export interface FeedbackSummary {
   total: number;
-  positive: number;
-  percent_positive: number;
+  average_rating: number;
 }

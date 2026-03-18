@@ -12,6 +12,9 @@ export default function App() {
   const [prefillQuestion, setPrefillQuestion] = useState("");
   const [prefillFile, setPrefillFile] = useState("");
   const [prefillSheet, setPrefillSheet] = useState("");
+  const [prefillRating, setPrefillRating] = useState<number | null>(null);
+  const [prefillHistoryIndex, setPrefillHistoryIndex] = useState<number | null>(null);
+  const [autoSubmitKey, setAutoSubmitKey] = useState(0);
 
   const handleUpload = useCallback(
     (uploaded: UploadedFile[]) => {
@@ -77,9 +80,15 @@ export default function App() {
                   onQueryComplete={() =>
                     setHistoryRefreshKey((k) => k + 1)
                   }
+                  onFeedbackSubmit={() =>
+                    setHistoryRefreshKey((k) => k + 1)
+                  }
                   prefillQuestion={prefillQuestion}
                   prefillFile={prefillFile}
                   prefillSheet={prefillSheet}
+                  prefillRating={prefillRating}
+                  prefillHistoryIndex={prefillHistoryIndex}
+                  autoSubmitKey={autoSubmitKey}
                 />
               </section>
             </div>
@@ -92,10 +101,13 @@ export default function App() {
               <HistoryPanel
                 sessionId={sessionId}
                 refreshKey={historyRefreshKey}
-                onSelectPrompt={(q: string, f: string, s: string) => {
+                onSelectPrompt={(q: string, f: string, s: string, r: number | null, idx: number) => {
                   setPrefillQuestion(q);
                   setPrefillFile(f);
                   setPrefillSheet(s);
+                  setPrefillRating(r);
+                  setPrefillHistoryIndex(idx);
+                  setAutoSubmitKey((k) => k + 1);
                 }}
               />
             </aside>

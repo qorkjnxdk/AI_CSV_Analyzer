@@ -12,12 +12,20 @@ async def get_history(x_session_id: str = Header(...)):
     if session is None:
         raise HTTPException(404, "Session not found")
 
-    return {"history": session["history"]}
+    # Attach feedback ratings to history entries
+    history = session["history"]
+    feedback = session["feedback"]
+    enriched = []
+    for i, entry in enumerate(history):
+        e = {**entry, "rating": feedback.get(str(i))}
+        enriched.append(e)
+
+    return {"history": enriched}
 
 
 class FeedbackRequest(BaseModel):
     history_index: int
-    rating: str  # "up" or "down"
+    rating: int  # 1-5
 
 
 @router.post("/feedback")
@@ -29,8 +37,8 @@ async def submit_feedback(
     if session is None:
         raise HTTPException(404, "Session not found")
 
-    if req.rating not in ("up", "down"):
-        raise HTTPException(400, "Rating must be 'up' or 'down'")
+    if req.rating < 1 or req.rating > 5:
+        raise HTTPException(400, "Rating must be between 1 and 5")
 
     if req.history_index < 0 or req.history_index >= len(session["history"]):
         raise HTTPException(400, "Invalid history index")
@@ -40,12 +48,11 @@ async def submit_feedback(
     # Calculate summary
     feedback = session["feedback"]
     total = len(feedback)
-    positive = sum(1 for v in feedback.values() if v == "up")
-    pct = round((positive / total) * 100) if total > 0 else 0
+    avg = round(sum(feedback.values()) / total, 1) if total > 0 else 0
 
     return {
         "success": True,
-        "summary": {"total": total, "positive": positive, "percent_positive": pct},
+        "summary": {"total": total, "average_rating": avg},
     }
 
 
@@ -57,7 +64,6 @@ async def feedback_summary(x_session_id: str = Header(...)):
 
     feedback = session["feedback"]
     total = len(feedback)
-    positive = sum(1 for v in feedback.values() if v == "up")
-    pct = round((positive / total) * 100) if total > 0 else 0
+    avg = round(sum(feedback.values()) / total, 1) if total > 0 else 0
 
-    return {"total": total, "positive": positive, "percent_positive": pct}
+    return {"total": total, "average_rating": avg}

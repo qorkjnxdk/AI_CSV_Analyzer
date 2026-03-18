@@ -9,6 +9,8 @@ def parse_file(file_bytes: bytes, filename: str) -> dict[str, pd.DataFrame]:
     """Parse an uploaded file into a dict of {sheet_name: DataFrame}.
 
     Raises ValueError on invalid file type or size.
+
+    Checks Magic Bytes of the file to ensure files are not being renamed .csv to bypass the upload check.
     """
     if len(file_bytes) > MAX_FILE_SIZE:
         raise ValueError(f"File exceeds 10MB limit ({len(file_bytes)} bytes)")

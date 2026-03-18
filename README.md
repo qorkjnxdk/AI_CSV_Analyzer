@@ -35,7 +35,7 @@ backend/           FastAPI + Python 3.11+
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate   # On Windows: venv\Scripts\activate
+source venv/bin/activate   # On Windows: .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
 # Create .env from template

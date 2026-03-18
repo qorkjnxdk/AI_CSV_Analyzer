@@ -15,6 +15,7 @@ class QueryRequest(BaseModel):
     question: str
     filename: str
     sheet: str = "Sheet1"
+    save_history: bool = True
 
 
 @router.post("/query")
@@ -45,25 +46,31 @@ async def query_data(
         raise HTTPException(404, f"Sheet '{req.sheet}' not found")
 
     log_query(x_session_id, req.question)
+    import logging
+    logging.getLogger("uvicorn.error").info("[QUERY] question=%s, file=%s", req.question, req.filename)
 
     # Get code from OpenAI
     try:
-        code = await ask_openai(df, req.question)
+        llm_response = await ask_openai(df, req.question)
     except Exception as e:
-        raise HTTPException(502, f"OpenAI API error: {str(e)}")
+        raise HTTPException(502, f"OpenAI API error: {type(e).__name__}: {e}")
 
-    # Execute in sandbox
-    result = execute_sandboxed(code, df)
+    # If the LLM returned a text response (not code), return it directly
+    if llm_response["type"] == "text":
+        result = {"type": "text", "data": llm_response["data"]}
+    else:
+        result = execute_sandboxed(llm_response["data"], df)
 
-    # Store in history
-    history_entry = {
-        "question": req.question,
-        "filename": req.filename,
-        "sheet": req.sheet,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "result": result,
-    }
-    session["history"].append(history_entry)
-    result["history_index"] = len(session["history"]) - 1
+    # Store in history (skip for replays and errors)
+    if req.save_history and result.get("type") != "error":
+        history_entry = {
+            "question": req.question,
+            "filename": req.filename,
+            "sheet": req.sheet,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "result": result,
+        }
+        session["history"].append(history_entry)
+        result["history_index"] = len(session["history"]) - 1
 
     return result

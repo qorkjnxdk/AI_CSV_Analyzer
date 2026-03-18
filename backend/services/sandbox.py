@@ -1,6 +1,7 @@
 import io
 import math
 import base64
+import traceback
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -70,10 +71,19 @@ def execute_sandboxed(code: str, df: pd.DataFrame) -> dict:
         "BytesIO": io.BytesIO,
     }
 
+    # Detect non-code responses (e.g. LLM refusals or explanations)
+    try:
+        compile(code, "<generated>", "exec")
+    except SyntaxError:
+        return {"type": "text", "data": code}
+
     try:
         exec(code, restricted_globals)
+    except SyntaxError:
+        # Text that slipped past the compile check — treat as a text response
+        return {"type": "text", "data": code}
     except Exception as e:
-        return {"type": "error", "data": f"Execution error: {str(e)}", "code": code}
+        return {"type": "error", "data": f"{type(e).__name__}: {e}", "code": code}
 
     # Check if a chart was created
     fig = plt.gcf()

@@ -15,6 +15,12 @@ export default function DataPreview({ sessionId, files }: Props) {
   const [rows, setRows] = useState<(string | number | null)[][]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [debouncedN, setDebouncedN] = useState(n);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedN(n), 400);
+    return () => clearTimeout(timer);
+  }, [n]);
 
   useEffect(() => {
     if (files.length > 0 && !selectedFile) {
@@ -26,7 +32,7 @@ export default function DataPreview({ sessionId, files }: Props) {
   useEffect(() => {
     if (!selectedFile || !selectedSheet) return;
     setLoading(true);
-    getPreview(sessionId, selectedFile, selectedSheet, n)
+    getPreview(sessionId, selectedFile, selectedSheet, debouncedN)
       .then((data) => {
         setColumns(data.columns);
         setRows(data.rows);
@@ -34,7 +40,7 @@ export default function DataPreview({ sessionId, files }: Props) {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [sessionId, selectedFile, selectedSheet, n]);
+  }, [sessionId, selectedFile, selectedSheet, debouncedN]);
 
   const currentFile = files.find((f) => f.filename === selectedFile);
 

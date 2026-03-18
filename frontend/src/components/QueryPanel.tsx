@@ -6,18 +6,26 @@ interface Props {
   sessionId: string;
   files: FileEntry[];
   onQueryComplete: () => void;
+  onFeedbackSubmit: () => void;
   prefillQuestion?: string;
   prefillFile?: string;
   prefillSheet?: string;
+  prefillRating?: number | null;
+  prefillHistoryIndex?: number | null;
+  autoSubmitKey?: number;
 }
 
 export default function QueryPanel({
   sessionId,
   files,
   onQueryComplete,
+  onFeedbackSubmit,
   prefillQuestion,
   prefillFile,
   prefillSheet,
+  prefillRating,
+  prefillHistoryIndex,
+  autoSubmitKey,
 }: Props) {
   const [question, setQuestion] = useState(prefillQuestion || "");
   const [selectedFile, setSelectedFile] = useState(files[0]?.filename || "");
@@ -25,13 +33,15 @@ export default function QueryPanel({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
+  const [feedback, setFeedback] = useState<number | null>(null);
+  const [hoverRating, setHoverRating] = useState(0);
 
   React.useEffect(() => {
     if (prefillQuestion) setQuestion(prefillQuestion);
     if (prefillFile) setSelectedFile(prefillFile);
     if (prefillSheet) setSelectedSheet(prefillSheet);
-  }, [prefillQuestion, prefillFile, prefillSheet]);
+    if (prefillRating !== undefined) setFeedback(prefillRating);
+  }, [prefillQuestion, prefillFile, prefillSheet, prefillRating]);
 
   React.useEffect(() => {
     if (files.length > 0 && !selectedFile) {
@@ -42,9 +52,8 @@ export default function QueryPanel({
 
   const currentFile = files.find((f) => f.filename === selectedFile);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!question.trim() || !selectedFile) return;
+  const runQuery = async (q: string, file: string, sheet: string, saveHistory: boolean) => {
+    if (!q.trim() || !file) return;
 
     setLoading(true);
     setError(null);
@@ -52,9 +61,14 @@ export default function QueryPanel({
     setFeedback(null);
 
     try {
-      const res = await queryData(sessionId, question, selectedFile, selectedSheet);
+      const res = await queryData(sessionId, q, file, sheet, saveHistory);
+      // For replays, attach the original history index so we can rate it
+      if (!saveHistory && prefillHistoryIndex != null) {
+        res.history_index = prefillHistoryIndex;
+        setFeedback(prefillRating ?? null);
+      }
       setResult(res);
-      onQueryComplete();
+      if (saveHistory) onQueryComplete();
     } catch (e: any) {
       setError(e?.response?.data?.detail || e.message || "Query failed");
     } finally {
@@ -62,11 +76,23 @@ export default function QueryPanel({
     }
   };
 
-  const handleFeedback = async (rating: "up" | "down") => {
-    if (result?.history_index == null || feedback) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runQuery(question, selectedFile, selectedSheet, true);
+  };
+
+  // Auto-submit when a history item is selected (replay — don't save to history)
+  React.useEffect(() => {
+    if (!autoSubmitKey || !prefillQuestion || !prefillFile) return;
+    runQuery(prefillQuestion, prefillFile, prefillSheet || "Sheet1", false);
+  }, [autoSubmitKey]);
+
+  const handleFeedback = async (rating: number) => {
+    if (result?.history_index == null) return;
     try {
       await submitFeedback(sessionId, result.history_index, rating);
       setFeedback(rating);
+      onFeedbackSubmit();
     } catch {}
   };
 
@@ -184,43 +210,38 @@ export default function QueryPanel({
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
               {result.type === "chart" ? "Chart" : result.type === "table" ? "Table" : result.type === "error" ? "Error" : "Answer"}
             </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handleFeedback("up")}
-                disabled={feedback !== null}
-                className={`p-1.5 rounded-md text-sm transition-colors cursor-pointer ${
-                  feedback === "up"
-                    ? "bg-green-100 text-green-600"
-                    : feedback === null
-                    ? "hover:bg-green-50 text-gray-400 hover:text-green-600"
-                    : "text-gray-200 cursor-default"
-                }`}
-                title="Helpful"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3" />
-                </svg>
-              </button>
-              <button
-                onClick={() => handleFeedback("down")}
-                disabled={feedback !== null}
-                className={`p-1.5 rounded-md text-sm transition-colors cursor-pointer ${
-                  feedback === "down"
-                    ? "bg-red-100 text-red-600"
-                    : feedback === null
-                    ? "hover:bg-red-50 text-gray-400 hover:text-red-600"
-                    : "text-gray-200 cursor-default"
-                }`}
-                title="Not helpful"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17" />
-                </svg>
-              </button>
-              {feedback && (
-                <span className="text-xs text-gray-400 ml-1">Thanks!</span>
+            <div className="flex items-center gap-0.5">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => handleFeedback(star)}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  disabled={feedback !== null}
+                  className={`p-0.5 transition-colors cursor-pointer disabled:cursor-default`}
+                  title={`${star} star${star > 1 ? "s" : ""}`}
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill={
+                      (feedback !== null ? star <= feedback : star <= hoverRating)
+                        ? "#f59e0b"
+                        : "none"
+                    }
+                    stroke={
+                      (feedback !== null ? star <= feedback : star <= hoverRating)
+                        ? "#f59e0b"
+                        : "#d1d5db"
+                    }
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                </button>
+              ))}
+              {feedback !== null && (
+                <span className="text-xs text-gray-400 ml-1.5">{feedback}/5</span>
               )}
             </div>
           </div>
@@ -228,9 +249,8 @@ export default function QueryPanel({
           {/* Result body */}
           <div className="p-4">
             {result.type === "error" && (
-              <div className="text-red-600 text-sm">
-                <p className="font-medium mb-1">Execution Error</p>
-                <p className="text-red-500">{result.data as string}</p>
+              <div className="text-red-600 text-sm whitespace-pre-wrap">
+                {result.data as string}
               </div>
             )}
 
