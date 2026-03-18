@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Start both frontend and backend servers
+# Prerequisites: run the initial setup steps in SETUP.md first
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -10,7 +11,7 @@ if [ -f "$DIR/backend/venv/Scripts/python.exe" ]; then
 elif [ -f "$DIR/backend/venv/bin/python" ]; then
   VENV_PYTHON="$DIR/backend/venv/bin/python"
 else
-  echo "Error: venv not found. Run 'bash setup.sh' first."
+  echo "Error: backend/venv not found. Follow the setup steps in SETUP.md first."
   exit 1
 fi
 

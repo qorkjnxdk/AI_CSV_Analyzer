@@ -17,7 +17,7 @@ export interface FileEntry {
 }
 
 export interface SubResult {
-  type: "scalar" | "table" | "text";
+  type: "scalar" | "table" | "text" | "chart";
   data: string | TableData;
 }
 

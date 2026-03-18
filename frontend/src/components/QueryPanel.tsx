@@ -157,7 +157,7 @@ export default function QueryPanel({
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="e.g. What is the average age of passengers?"
-            className="w-full border border-gray-200 rounded-lg px-4 py-3 pr-24 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder:text-gray-400"
+            className="w-full border border-gray-200 rounded-lg px-4 py-3 pr-32 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder:text-gray-400"
           />
           <button
             type="submit"
@@ -344,6 +344,15 @@ export default function QueryPanel({
                         </div>
                       );
                     })()}
+                    {sub.type === "chart" && (
+                      <div>
+                        <img
+                          src={`data:image/png;base64,${sub.data}`}
+                          alt="Generated chart"
+                          className="max-w-full rounded-md border border-gray-100"
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

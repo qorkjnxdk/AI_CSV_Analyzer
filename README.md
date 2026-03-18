@@ -2,87 +2,102 @@
 
 A full-stack web application that allows users to upload CSV/Excel files and ask natural language questions about their data. Built with React + TypeScript (frontend) and FastAPI + Python (backend), powered by OpenAI GPT-4o.
 
-## Features
+> For installation and setup instructions, see [SETUP.md](SETUP.md).
 
-- **Multi-file upload** — Upload one or more CSV, XLS, or XLSX files per session
-- **Data preview** — View the top N rows of any uploaded file/sheet with adjustable row count
-- **Natural language Q&A** — Ask questions about your data in plain English; the AI generates and executes pandas code
-- **Chart generation** — Request visualizations (bar, line, scatter, histogram, pie) rendered inline
-- **Prompt history** — Browse and re-use past prompts from the sidebar
-- **Feedback system** — Rate AI responses with thumbs up/down; view feedback summary
+## Application Features
 
-## Architecture
+### 1. Multi-File Upload
 
-```
-frontend/          React + TypeScript + Tailwind CSS (Vite)
-backend/           FastAPI + Python 3.11+
-├── routers/       upload.py, query.py, history.py
-├── services/      file_service.py, query_service.py, sandbox.py
-├── security/      injection_guard.py, magic_bytes.py, audit_logger.py
-└── session/       session_store.py (in-memory dataframe registry)
-```
+Upload one or more CSV, XLS, or XLSX files per session. Files are validated for type (magic byte verification) and size (10 MB limit), then parsed into in-memory DataFrames — nothing is written to disk.
 
-## Setup
+### 2. Data Preview
 
-### Prerequisites
+View the top N rows of any uploaded file or sheet. N is user-adjustable (1–500, default 10). Users can switch between different files and sheets via dropdown selectors. The total row count is displayed alongside the preview.
 
-- Python 3.11+
-- Node.js 18+
-- An OpenAI API key
+### 3. Natural Language Q&A
 
-### Backend
+Ask questions about your data in plain English. The AI generates pandas code behind the scenes, executes it in a sandboxed environment, and returns the result. Users can select which file and sheet to query.
 
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate   # On Windows: .\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+Example prompts:
+- *"What is the average age of passengers?"*
+- *"Show all rows where Fare > 100"*
+- *"What does the Embarked column represent?"*
 
-# Create .env from template
-cp ../.env.example .env
-# Edit .env and add your OpenAI API key
+### 4. Prompt History
 
-uvicorn main:app --reload --port 8000
-```
+All past prompts are saved in a sidebar, displayed in reverse chronological order. Clicking a history entry replays the query, allowing users to revisit or compare previous results. History entries are color-coded by rating (green for high, yellow for neutral, red for low).
 
-### Frontend
+### 5. Feedback System
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+Each query result has a 5-star rating widget. Users rate whether the AI's answer was useful. An aggregate summary (average rating and total count) is displayed at the bottom of the history panel, allowing users to assess overall response quality.
 
-The frontend runs at `http://localhost:5173` and the backend API at `http://localhost:8000`.
+### 6. Combined Multi-Output Responses
+
+A single prompt can generate any combination of three output types, displayed in this order:
+
+| Output | Variable | Description |
+|---|---|---|
+| **Answer** | `result` | A scalar value or descriptive text with context |
+| **Table** | `result_table` | A filtered or computed DataFrame |
+| **Chart** | matplotlib/seaborn | A visualization captured automatically |
+
+This allows complex analytical questions to be answered in full with one prompt.
+
+#### Example: Combined Prompt
+
+**Prompt:** *"How many people were in pclass 3, display them, and show the distribution of passengers in each pclass"*
+
+This produces all three outputs:
+
+1. **Answer** — `"Number of passengers in Pclass 3: 96"`
+2. **Table** — All 96 passenger rows from Pclass 3
+3. **Chart** — A bar chart showing the count of passengers in each Pclass (1, 2, 3)
+
+Behind the scenes, the LLM generates code that sets `result` (the count), `result_table` (the filtered DataFrame), and creates a matplotlib bar chart — all in one script. The sandbox captures each output, processes them and returns them together.
+
+---
 
 ## Security Considerations
 
-This application implements security as a first-class concern:
+Security is implemented as a multi-layered concern across file handling, query processing, code execution, and audit logging.
 
-| Feature | Attack Mitigated | Implementation |
+### Summary
+
+| Layer | Attack Mitigated | Implementation |
 |---|---|---|
 | **API key protection** | Key theft via Git history | Key stored in `.env`, excluded via `.gitignore` |
-| **Magic byte validation** | Malicious file disguised as CSV | `python-magic` reads file header bytes to verify true MIME type |
-| **Sandboxed code execution** | LLM-generated code executing system commands | `exec()` runs with restricted globals — only pandas/numpy/matplotlib allowed; `os`, `subprocess`, `open`, `__import__` are blocked |
-| **Prompt injection detection** | User manipulating LLM context | Input scanned for known injection patterns before being sent to OpenAI |
-| **Audit logging** | Undetected abuse | Every upload and query logged with timestamp, session ID, and hash — no raw user data in logs |
-| **In-memory file handling** | Sensitive data persisting on disk | All files parsed into pandas DataFrames via `BytesIO`; no temp files written |
+| **Magic byte validation** | Malicious file disguised as CSV | `python-magic` reads file header bytes to verify true MIME type; extension-MIME mismatch is rejected |
+| **File size limit** | Denial of service via large uploads | 10 MB per-file limit enforced before parsing |
+| **Sandboxed code execution** | LLM-generated code executing system commands | `exec()` runs with restricted globals — only pandas, numpy, matplotlib, seaborn allowed; `os`, `subprocess`, `open`, `__import__` are all blocked |
+| **Prompt injection detection** | User manipulating LLM context | 23 regex patterns scan for instruction overrides, context extraction, and role manipulation before the query reaches OpenAI |
+| **Audit logging** | Undetected abuse or forensic analysis | Every upload, query, and blocked injection logged with timestamp and SHA-256 hashes — no raw user data in logs |
+| **In-memory file handling** | Sensitive data persisting on disk | All files parsed into DataFrames via `BytesIO`; no temp files written to the filesystem |
+| **Session TTL** | Stale data and resource exhaustion | Sessions expire after 60 minutes of inactivity; cleanup runs every 5 minutes |
 
-### Sandboxed Execution Detail
+### Sandboxed Execution
 
-The most significant security risk is executing LLM-generated code. The sandbox:
-- Constructs a restricted globals dict with only `df`, `pd`, `np`, `plt`, `sns`, and `BytesIO`
-- Removes all Python builtins except a safe whitelist (`len`, `range`, `str`, `int`, `float`, `list`, `dict`, `sum`, `min`, `max`, `round`, `print`, etc.)
-- Catches and surfaces all exceptions as user-facing errors
-- Prevents file system access, subprocess spawning, network calls, and arbitrary imports
+The most significant security risk is executing LLM-generated code. The sandbox mitigates this by:
+
+- Constructing a restricted globals dict with **only** `df`, `pd`, `np`, `plt`, `sns`, and `BytesIO`
+- Removing all Python builtins except a safe whitelist (`len`, `range`, `str`, `int`, `float`, `list`, `dict`, `sum`, `min`, `max`, `round`, `print`, `sorted`, `enumerate`, `zip`, `map`, `filter`, `abs`, `bool`, `tuple`, `set`, `isinstance`, `type`)
+- Operating on a **copy** of the DataFrame so the original data is never mutated
+- Catching and surfacing all exceptions as user-facing errors
+- Blocking file system access, subprocess spawning, network calls, and dynamic imports
 
 ### Prompt Injection Detection
 
-User queries are scanned for instruction overrides, context extraction attempts, and role manipulation patterns. Flagged queries are rejected with HTTP 400 and logged in the audit trail.
+User queries are scanned against 23 regex patterns before being sent to OpenAI. These cover three categories:
 
-## Environment Variables
+1. **Instruction overrides** — e.g. *"ignore previous instructions"*, *"disregard your prompt"*
+2. **Context extraction** — e.g. *"reveal your instructions"*, *"show the API key"*
+3. **Role manipulation** — e.g. *"you are now a..."*, *"pretend you are"*, *"new instructions:"*
 
-| Variable | Description | Default |
-|---|---|---|
-| `OPENAI_API_KEY` | Your OpenAI API key | (required) |
-| `OPENAI_MODEL` | Model to use for code generation | `gpt-4o` |
+Flagged queries are rejected with HTTP 400 and logged in the audit trail with the matched pattern.
+
+### Audit Trail
+
+All operations are logged to `backend/audit.log` (rotating, max 5 MB, 3 backups). Sensitive data (filenames, queries) is hashed with SHA-256 so the log is useful for forensic analysis without exposing raw user data. Example entry:
+
+```
+[2026-03-18T06:59:47+00:00] QUERY session=202cd1b9 query_hash=c831e8657b4c5724
+```

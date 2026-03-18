@@ -85,77 +85,68 @@ def execute_sandboxed(code: str, df: pd.DataFrame) -> dict:
     except Exception as e:
         return {"type": "error", "data": f"{type(e).__name__}: {e}", "code": code}
 
-    # Check if a chart was created
+    # --- Collect all output parts (order: answer → table → chart) ---
+    parts = []
+
+    # 1. Scalar / text answer from `result`
+    result = restricted_globals.get("result")
+    if result is not None:
+        if isinstance(result, pd.DataFrame):
+            parts.append({
+                "type": "table",
+                "data": {
+                    "columns": result.columns.tolist(),
+                    "rows": _sanitize_rows(result.head(500).values.tolist()),
+                },
+            })
+            result = None  # handled as table, don't duplicate
+        elif isinstance(result, pd.Series):
+            result_df = result.reset_index()
+            parts.append({
+                "type": "table",
+                "data": {
+                    "columns": result_df.columns.tolist(),
+                    "rows": _sanitize_rows(result_df.head(500).values.tolist()),
+                },
+            })
+            result = None
+        else:
+            parts.append({"type": "scalar", "data": str(result)})
+
+    # 2. Table from `result_table`
+    result_table = restricted_globals.get("result_table")
+    if isinstance(result_table, pd.DataFrame):
+        parts.append({
+            "type": "table",
+            "data": {
+                "columns": result_table.columns.tolist(),
+                "rows": _sanitize_rows(result_table.head(500).values.tolist()),
+            },
+        })
+    elif isinstance(result_table, pd.Series):
+        rt_df = result_table.reset_index()
+        parts.append({
+            "type": "table",
+            "data": {
+                "columns": rt_df.columns.tolist(),
+                "rows": _sanitize_rows(rt_df.head(500).values.tolist()),
+            },
+        })
+
+    # 3. Chart from matplotlib
     fig = plt.gcf()
     if fig.get_axes():
         fig.savefig(chart_buf, format="png", bbox_inches="tight", dpi=150)
-        plt.close("all")
         chart_buf.seek(0)
         chart_b64 = base64.b64encode(chart_buf.read()).decode("utf-8")
-        text = restricted_globals.get("result", "")
-        return {
-            "type": "chart",
-            "data": chart_b64,
-            "text": str(text) if text else "",
-            "code": code,
-        }
-
+        parts.append({"type": "chart", "data": chart_b64})
     plt.close("all")
 
-    result = restricted_globals.get("result")
-    result_table = restricted_globals.get("result_table")
-
-    # Convert result_table to table dict if present
-    table_part = None
-    if isinstance(result_table, pd.DataFrame):
-        table_part = {
-            "columns": result_table.columns.tolist(),
-            "rows": _sanitize_rows(result_table.head(500).values.tolist()),
-        }
-    elif isinstance(result_table, pd.Series):
-        rt_df = result_table.reset_index()
-        table_part = {
-            "columns": rt_df.columns.tolist(),
-            "rows": _sanitize_rows(rt_df.head(500).values.tolist()),
-        }
-
-    # Both result and result_table set → return multi
-    if table_part is not None and result is not None:
-        return {
-            "type": "multi",
-            "data": [
-                {"type": "scalar", "data": str(result)},
-                {"type": "table", "data": table_part},
-            ],
-            "code": code,
-        }
-
-    # Only result_table set
-    if table_part is not None:
-        return {"type": "table", "data": table_part, "code": code}
-
-    if result is None:
+    # --- Return based on how many parts we collected ---
+    if len(parts) == 0:
         return {"type": "text", "data": "Code executed but no result variable was set.", "code": code}
 
-    if isinstance(result, pd.DataFrame):
-        return {
-            "type": "table",
-            "data": {
-                "columns": result.columns.tolist(),
-                "rows": _sanitize_rows(result.head(500).values.tolist()),
-            },
-            "code": code,
-        }
+    if len(parts) == 1:
+        return {**parts[0], "code": code}
 
-    if isinstance(result, pd.Series):
-        result_df = result.reset_index()
-        return {
-            "type": "table",
-            "data": {
-                "columns": result_df.columns.tolist(),
-                "rows": _sanitize_rows(result_df.head(500).values.tolist()),
-            },
-            "code": code,
-        }
-
-    return {"type": "scalar", "data": str(result), "code": code}
+    return {"type": "multi", "data": parts, "code": code}
