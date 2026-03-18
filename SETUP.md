@@ -1,5 +1,12 @@
 # Setup Guide
 
+## Clone the Repository
+
+```bash
+git clone https://github.com/qorkjnxdk/AI_CSV_Anaylzer.git
+cd AI_CSV_Anaylzer
+```
+
 ## Prerequisites
 
 - Python 3.11+

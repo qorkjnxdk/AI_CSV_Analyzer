@@ -2,7 +2,7 @@
 
 A full-stack web application that allows users to upload CSV/Excel files and ask natural language questions about their data. Built with React + TypeScript (frontend) and FastAPI + Python (backend), powered by OpenAI GPT-4o.
 
-> For installation and setup instructions, see [SETUP.md](SETUP.md).
+> For installation and setup instructions, see [SETUP.md](SETUP.md). For API endpoint details, see [API.md](API.md).
 
 ## Application Features
 
@@ -108,6 +108,16 @@ User queries are scanned against 23 regex patterns before being sent to OpenAI. 
 
 Flagged queries are rejected with HTTP 400 and logged in the audit trail with the matched pattern.
 
+### File Type Validation Test
+
+A test script (`fake_file.py`) is included to verify that magic byte validation works correctly. It generates a file named `fake.csv` that has a `.csv` extension but contains a Windows executable (PE) header:
+
+```bash
+python fake_file.py
+```
+
+Uploading the resulting `fake.csv` through the UI should be rejected — the backend reads the file's magic bytes, detects a MIME type mismatch (executable content disguised as CSV), and returns an error.
+
 ### Audit Trail
 
 All operations are logged to `backend/audit.log` (rotating, max 5 MB, 3 backups). Sensitive data (filenames, queries) is hashed with SHA-256 so the log is useful for forensic analysis without exposing raw user data. Example entry:
@@ -115,3 +125,4 @@ All operations are logged to `backend/audit.log` (rotating, max 5 MB, 3 backups)
 ```
 [2026-03-18T06:59:47+00:00] QUERY session=202cd1b9 query_hash=c831e8657b4c5724
 ```
+
