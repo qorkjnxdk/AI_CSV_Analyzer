@@ -3,6 +3,7 @@
 ## Clone the Repository
 
 ```bash
+git init
 git clone https://github.com/qorkjnxdk/AI_CSV_Anaylzer.git
 cd AI_CSV_Anaylzer
 ```
