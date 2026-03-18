@@ -80,6 +80,8 @@ export default function QueryPanel({
 
   const currentFile = files.find((f) => f.filename === selectedFile);
 
+  // Core query function: sends question to backend, handles response (including history
+  // ===replays where we reattach the original index for rating), and errors (429 triggers countdown)
   const runQuery = async (q: string, file: string, sheet: string, saveHistory: boolean) => {
     if (!q.trim() || !file) return;
 
@@ -109,17 +111,20 @@ export default function QueryPanel({
     }
   };
 
+  // Form submit handler: calls runQuery with saveHistory=true for new queries
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await runQuery(question, selectedFile, selectedSheet, true);
   };
 
-  // Auto-submit when a history item is selected (replay — don't save to history)
+  // Auto-submit when a history item is selected (replay — don't save to history).
+  // Triggers when autoSubmitKey changes (set by parent when user clicks a history entry)
   React.useEffect(() => {
     if (!autoSubmitKey || !prefillQuestion || !prefillFile) return;
     runQuery(prefillQuestion, prefillFile, prefillSheet || "Sheet1", false);
   }, [autoSubmitKey]);
 
+  // Sends star rating to backend for the current result's history entry, then notifies parent to refresh the history panel
   const handleFeedback = async (rating: number) => {
     if (result?.history_index == null) return;
     try {
@@ -129,6 +134,7 @@ export default function QueryPanel({
     } catch {}
   };
 
+  // Creates a temporary download link from the base64-encoded chart image and triggers a browser download
   const downloadChartPNG = (b64: string) => {
     const link = document.createElement("a");
     link.href = `data:image/png;base64,${b64}`;
@@ -136,6 +142,7 @@ export default function QueryPanel({
     link.click();
   };
 
+  // Converts table data to CSV (with proper escaping for commas, quotes, newlines), creates a Blob, and triggers a browser download
   const downloadTableCSV = (table: TableData) => {
     const escape = (val: string) =>
       val.includes(",") || val.includes('"') || val.includes("\n")
@@ -402,6 +409,8 @@ export default function QueryPanel({
               );
             })()}
 
+            {/* Multi-output renderer: iterates over sub-results (scalar, text, table, chart)
+                and renders each with its appropriate component */}
             {result.type === "multi" && (
               <div className="space-y-4">
                 {(result.data as SubResult[]).map((sub, idx) => (

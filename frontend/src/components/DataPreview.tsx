@@ -17,11 +17,15 @@ export default function DataPreview({ sessionId, files }: Props) {
   const [loading, setLoading] = useState(false);
   const [debouncedN, setDebouncedN] = useState(n);
 
+  // Debounce the "Rows" input — waits 400ms after the user stops typing
+  // before updating debouncedN, so we don't fire an API call on every keystroke
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedN(n), 400);
     return () => clearTimeout(timer);
   }, [n]);
 
+  // Auto-select the first file and sheet when files are loaded
+  // and nothing is selected yet (initial mount)
   useEffect(() => {
     if (files.length > 0 && !selectedFile) {
       setSelectedFile(files[0].filename);
@@ -29,6 +33,8 @@ export default function DataPreview({ sessionId, files }: Props) {
     }
   }, [files, selectedFile]);
 
+  // Fetch preview data from the backend whenever the selected file, sheet, or row count changes. 
+  // Uses debouncedN so rapid row count changes only trigger one API call
   useEffect(() => {
     if (!selectedFile || !selectedSheet) return;
     setLoading(true);
@@ -42,6 +48,7 @@ export default function DataPreview({ sessionId, files }: Props) {
       .finally(() => setLoading(false));
   }, [sessionId, selectedFile, selectedSheet, debouncedN]);
 
+  // Look up the full file entry for the selected filename, used to get the list of sheets for the sheet dropdown
   const currentFile = files.find((f) => f.filename === selectedFile);
 
   return (
@@ -55,6 +62,7 @@ export default function DataPreview({ sessionId, files }: Props) {
           <select
             className="border border-gray-200 rounded-md px-3 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
             value={selectedFile}
+            // When user picks a different file, also reset the sheet selection to that file's first sheet
             onChange={(e) => {
               setSelectedFile(e.target.value);
               const f = files.find((f) => f.filename === e.target.value);

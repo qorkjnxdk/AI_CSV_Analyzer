@@ -13,13 +13,19 @@ export default function FileUploader({
   sessionId,
   setSessionId,
 }: Props) {
+  
+  // Reference to the hidden file input — used to programmatically open the file picker
+  // from the styled button, and to reset its value so re-selecting the same file still triggers onChange
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Validates selected files (extension check), sends them to the backend, updates the session ID, and surfaces any errors (rate limit, failed files, unsupported types)
   const handleUpload = useCallback(
     async (fileList: FileList | null) => {
       if (!fileList || fileList.length === 0) return;
+
+      // Client-side guard: reject files that don't end in .csv/.xls/.xlsx before sending to backend (backend also validates via magic bytes)
       const allowed = [".csv", ".xls", ".xlsx"];
       const invalid = Array.from(fileList).filter(
         (f) => !allowed.some((ext) => f.name.toLowerCase().endsWith(ext))
@@ -40,6 +46,7 @@ export default function FileUploader({
         setSessionId(result.session_id);
         onUpload(result.files);
 
+        // Check if any files were rejected by the backend (e.g. magic byte mismatch) and show their error messages
         const failed = result.files.filter((f) => !f.success);
         if (failed.length > 0) {
           setError(

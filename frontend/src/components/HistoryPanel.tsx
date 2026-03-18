@@ -68,6 +68,8 @@ export default function HistoryPanel({
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [summary, setSummary] = useState<FeedbackSummary | null>(null);
 
+  // Fetch history and feedback summary whenever the session changes or refreshKey
+  // increments (which happens after a new query or feedback submission)
   useEffect(() => {
     getHistory(sessionId).then((data) => setHistory(data.history));
     getFeedbackSummary(sessionId).then(setSummary).catch(() => {});
@@ -81,10 +83,13 @@ export default function HistoryPanel({
 
   return (
     <div className="space-y-2">
+      {/* Display in reverse chronological order (newest first).
+          .slice() avoids mutating the original array */}
       {history
         .slice()
         .reverse()
         .map((entry, i) => {
+          // Map reversed display index back to original history array index, needed when replaying a query or submitting feedback for a specific entry
           const realIndex = history.length - 1 - i;
           return (
             <button
@@ -110,6 +115,7 @@ export default function HistoryPanel({
           );
         })}
 
+      {/* Aggregate feedback stats — average rating + count, shown only if at least one entry has been rated */}
       {summary && summary.total > 0 && (
         <div className="pt-3 border-t flex items-center justify-center gap-2 text-xs text-gray-500">
           <span>Avg rating:</span>
