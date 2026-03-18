@@ -80,6 +80,7 @@ Query results can be exported directly from the UI:
 | **Audit logging** | Undetected abuse or forensic analysis | Every upload, query, and blocked injection logged with timestamp and SHA-256 hashes — no raw user data in logs |
 | **In-memory file handling** | Sensitive data persisting on disk | All files parsed into DataFrames via `BytesIO`; no temp files written to the filesystem |
 | **Session TTL** | Stale data and resource exhaustion | Sessions expire after 60 minutes of inactivity; cleanup runs every 5 minutes |
+| **CORS restriction** | Cross-origin request abuse | `allow_origin_regex` permits only `localhost` origins (`^https?://localhost(:\d+)?$`); all other origins are blocked |
 | **Rate limiting** | API abuse and resource exhaustion | Per-IP limits: 10 queries/min on `/query`, 4 uploads/min on `/upload`; returns HTTP 429 with user-friendly frontend message |
 
 ### Sandboxed Execution
