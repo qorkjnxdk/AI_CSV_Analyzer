@@ -55,6 +55,25 @@ This launches the backend and frontend in parallel:
 
 Press `Ctrl+C` to stop both servers.
 
+### Manual Start (if the script fails)
+
+Open two separate terminals from the project root:
+
+**Terminal 1 — Backend:**
+
+```bash
+cd backend
+source venv/bin/activate   # On Windows: .\venv\Scripts\Activate.ps1
+python -m uvicorn main:app --reload --port 8000
+```
+
+**Terminal 2 — Frontend:**
+
+```bash
+cd frontend
+npm run dev
+```
+
 ## Environment Variables
 
 | Variable | Description | Default |
