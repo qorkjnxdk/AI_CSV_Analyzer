@@ -4,8 +4,8 @@
 
 ```bash
 git init
-git clone https://github.com/qorkjnxdk/AI_CSV_Anaylzer.git
-cd AI_CSV_Anaylzer
+git clone https://github.com/qorkjnxdk/AI_CSV_Analyzer.git
+cd AI_CSV_Analyzer
 ```
 
 ## Prerequisites
