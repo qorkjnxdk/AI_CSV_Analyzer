@@ -103,6 +103,37 @@ def execute_sandboxed(code: str, df: pd.DataFrame) -> dict:
     plt.close("all")
 
     result = restricted_globals.get("result")
+    result_table = restricted_globals.get("result_table")
+
+    # Convert result_table to table dict if present
+    table_part = None
+    if isinstance(result_table, pd.DataFrame):
+        table_part = {
+            "columns": result_table.columns.tolist(),
+            "rows": _sanitize_rows(result_table.head(500).values.tolist()),
+        }
+    elif isinstance(result_table, pd.Series):
+        rt_df = result_table.reset_index()
+        table_part = {
+            "columns": rt_df.columns.tolist(),
+            "rows": _sanitize_rows(rt_df.head(500).values.tolist()),
+        }
+
+    # Both result and result_table set → return multi
+    if table_part is not None and result is not None:
+        return {
+            "type": "multi",
+            "data": [
+                {"type": "scalar", "data": str(result)},
+                {"type": "table", "data": table_part},
+            ],
+            "code": code,
+        }
+
+    # Only result_table set
+    if table_part is not None:
+        return {"type": "table", "data": table_part, "code": code}
+
     if result is None:
         return {"type": "text", "data": "Code executed but no result variable was set.", "code": code}
 

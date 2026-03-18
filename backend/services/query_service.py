@@ -26,6 +26,7 @@ Rules:
 - The DataFrame is available as `df`.
 - pandas is imported as `pd`, numpy as `np`, matplotlib.pyplot as `plt`, seaborn as `sns`.
 - Store the final answer in a variable called `result`.
+- If you need to return BOTH a table AND a summary answer (e.g. "show all rows where X and count them"), store the filtered DataFrame in `result_table` and the summary value in `result`. Both will be displayed.
 - If the question asks for an explanation, description, or meaning of a column or the data (not a computation), set `result` to a plain-text string with your answer. Do NOT run any data queries for these questions.
 - If the question asks for a chart/plot/graph/visualization, generate matplotlib or seaborn code to create it. Do NOT set `result` for chart-only answers.
 - For charts: always add axis labels and a title.

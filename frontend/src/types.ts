@@ -16,9 +16,14 @@ export interface FileEntry {
   sheets: string[];
 }
 
-export interface QueryResult {
-  type: "scalar" | "table" | "chart" | "text" | "error";
+export interface SubResult {
+  type: "scalar" | "table" | "text";
   data: string | TableData;
+}
+
+export interface QueryResult {
+  type: "scalar" | "table" | "chart" | "text" | "error" | "multi";
+  data: string | TableData | SubResult[];
   text?: string;
   code?: string;
   history_index?: number;

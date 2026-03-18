@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { queryData, submitFeedback } from "../api";
-import type { FileEntry, QueryResult, TableData } from "../types";
+import type { FileEntry, QueryResult, TableData, SubResult } from "../types";
 
 interface Props {
   sessionId: string;
@@ -208,7 +208,7 @@ export default function QueryPanel({
           {/* Result header */}
           <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex items-center justify-between">
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              {result.type === "chart" ? "Chart" : result.type === "table" ? "Table" : result.type === "error" ? "Error" : "Answer"}
+              {result.type === "chart" ? "Chart" : result.type === "table" ? "Table" : result.type === "multi" ? "Results" : result.type === "error" ? "Error" : "Answer"}
             </span>
             <div className="flex items-center gap-0.5">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -303,6 +303,51 @@ export default function QueryPanel({
                 </div>
               );
             })()}
+
+            {result.type === "multi" && (
+              <div className="space-y-4">
+                {(result.data as SubResult[]).map((sub, idx) => (
+                  <div key={idx}>
+                    {sub.type === "scalar" && (
+                      <div>
+                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Answer</span>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{sub.data as string}</p>
+                      </div>
+                    )}
+                    {sub.type === "text" && (
+                      <p className="text-sm text-gray-700 leading-relaxed">{sub.data as string}</p>
+                    )}
+                    {sub.type === "table" && (() => {
+                      const table = sub.data as TableData;
+                      return (
+                        <div className="overflow-x-auto rounded-md border border-gray-100">
+                          <table className="min-w-full text-sm">
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-200">
+                                {table.columns.map((col) => (
+                                  <th key={col} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{col}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {table.rows.map((row, i) => (
+                                <tr key={i} className="hover:bg-blue-50/30">
+                                  {row.map((cell, j) => (
+                                    <td key={j} className="px-3 py-2 whitespace-nowrap text-gray-700">
+                                      {cell === null ? <span className="text-gray-300">--</span> : String(cell)}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {result.type === "chart" && (
               <div>
