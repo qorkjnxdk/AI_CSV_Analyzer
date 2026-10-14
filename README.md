@@ -75,7 +75,7 @@ Query results can be exported directly from the UI:
 | **API key protection** | Key theft via Git history | Key stored in `.env`, excluded via `.gitignore` |
 | **Magic byte validation** | Malicious file disguised as CSV | `python-magic` reads file header bytes to verify true MIME type; extension-MIME mismatch is rejected |
 | **File size limit** | Denial of service via large uploads | 10 MB per-file limit enforced before parsing |
-| **Sandboxed code execution** | LLM-generated code executing system commands | `exec()` runs with restricted globals — only pandas, numpy, matplotlib, seaborn allowed; `os`, `subprocess`, `open`, `__import__` are all blocked |
+| **Sandboxed code execution** | LLM-generated code executing system commands | `exec()` runs with restricted globals — only pandas, numpy, matplotlib, seaborn allowed; `os`, `subprocess`, `__import__` are all blocked |
 | **Prompt injection detection** | User manipulating LLM context | 23 regex patterns scan for instruction overrides, context extraction, and role manipulation before the query reaches OpenAI |
 | **Audit logging** | Undetected abuse or forensic analysis | Every upload, query, and blocked injection logged with timestamp and SHA-256 hashes — no raw user data in logs |
 | **In-memory file handling** | Sensitive data persisting on disk | All files parsed into DataFrames via `BytesIO`; no temp files written to the filesystem |
